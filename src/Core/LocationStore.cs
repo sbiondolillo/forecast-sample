@@ -36,24 +36,27 @@ public sealed class LocationStore(string path)
         }
 
         using SqliteConnection connection = Open(SqliteOpenMode.ReadOnly);
+        using (SqliteCommand probe = connection.CreateCommand())
+        {
+            probe.CommandText = "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'locations'";
+
+            // A file with no table holds no locations.
+            if (probe.ExecuteScalar() is null)
+            {
+                return [];
+            }
+        }
+
         using SqliteCommand select = connection.CreateCommand();
         select.CommandText = "SELECT id, name, latitude, longitude FROM locations ORDER BY id";
-        try
+        using SqliteDataReader reader = select.ExecuteReader();
+        var locations = new List<Location>();
+        while (reader.Read())
         {
-            using SqliteDataReader reader = select.ExecuteReader();
-            var locations = new List<Location>();
-            while (reader.Read())
-            {
-                locations.Add(new Location(reader.GetInt64(0), reader.GetString(1), reader.GetDouble(2), reader.GetDouble(3)));
-            }
+            locations.Add(new Location(reader.GetInt64(0), reader.GetString(1), reader.GetDouble(2), reader.GetDouble(3)));
+        }
 
-            return locations;
-        }
-        catch (SqliteException e) when (e.SqliteErrorCode is 1)
-        {
-            // A file with no table holds no locations.
-            return [];
-        }
+        return locations;
     }
 
     private SqliteConnection Open(SqliteOpenMode mode)

@@ -1,4 +1,5 @@
 using Core;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Specs.Unit;
@@ -20,6 +21,33 @@ public sealed class LocationStoreTests : IDisposable
 
         Assert.Empty(store.List());
         Assert.False(store.Exists);
+    }
+
+    [Fact]
+    public void ListAFileWithoutTheTableHoldsNoLocation()
+    {
+        string path = Path.Combine(_directory, "forecast.db");
+        Execute(path, "CREATE TABLE other (id INTEGER)");
+
+        Assert.Empty(new LocationStore(path).List());
+    }
+
+    [Fact]
+    public void ListATableMissingAColumnSurfacesTheError()
+    {
+        string path = Path.Combine(_directory, "forecast.db");
+        Execute(path, "CREATE TABLE locations (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
+
+        Assert.Throws<SqliteException>(() => new LocationStore(path).List());
+    }
+
+    private static void Execute(string path, string sql)
+    {
+        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
+        connection.Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
     }
 
     [Fact]
