@@ -1,0 +1,98 @@
+using System.CommandLine;
+using System.CommandLine.Invocation;
+
+namespace Core;
+
+/// <summary>The command tree of the console program: <c>add</c> and <c>list</c>.</summary>
+public static class TrackerCommand
+{
+    private const string DefaultDatabase = "forecast.db";
+
+    /// <summary>The root command. The geocoding requests go through the given client.</summary>
+    public static RootCommand Create(HttpClient http)
+    {
+        var geocoding = new GeocodingClient(http);
+        var root = new RootCommand("Tracks the places whose weather a person follows.");
+        root.Subcommands.Add(CreateAdd(geocoding));
+        root.Subcommands.Add(CreateList());
+        return root;
+    }
+
+    private static Option<string> DatabaseOption() => new("--database")
+    {
+        Description = "The SQLite file that holds the tracked locations.",
+        DefaultValueFactory = _ => DefaultDatabase,
+    };
+
+    private static Command CreateAdd(GeocodingClient geocoding)
+    {
+        var name = new Argument<string>("name")
+        {
+            Description = "The name of the place to track.",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+        Option<string> database = DatabaseOption();
+        var command = new Command("add", "Adds the place of a name to the tracked locations.");
+        command.Arguments.Add(name);
+        command.Options.Add(database);
+        command.SetAction((result, cancellationToken) =>
+            AddAsync(result, geocoding, result.GetRequiredValue(name), result.GetRequiredValue(database), cancellationToken));
+        return command;
+    }
+
+    private static Command CreateList()
+    {
+        Option<string> database = DatabaseOption();
+        var command = new Command("list", "Lists the tracked locations.");
+        command.Options.Add(database);
+        command.SetAction(result => List(result, result.GetRequiredValue(database)));
+        return command;
+    }
+
+    private static async Task<int> AddAsync(ParseResult result, GeocodingClient geocoding, string name, string database, CancellationToken cancellationToken)
+    {
+        InvocationConfiguration configuration = result.InvocationConfiguration;
+        IReadOnlyList<Place> places;
+        try
+        {
+            places = await geocoding.SearchAsync(name, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is HttpRequestException || (e is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            configuration.Error.WriteLine($"The geocoding service gave no answer for \"{name}\".");
+            return 1;
+        }
+
+        switch (places.Count)
+        {
+            case 0:
+                configuration.Error.WriteLine($"No place has the name \"{name}\".");
+                return 1;
+            case > 1:
+                configuration.Error.WriteLine($"The name \"{name}\" matches several places.");
+                return 1;
+        }
+
+        Location added = new LocationStore(database).Add(places[0]);
+        configuration.Output.WriteLine($"Added {added.Name} {added.Coordinates}");
+        return 0;
+    }
+
+    private static int List(ParseResult result, string database)
+    {
+        TextWriter output = result.InvocationConfiguration.Output;
+        IReadOnlyList<Location> locations = new LocationStore(database).List();
+        if (locations.Count is 0)
+        {
+            output.WriteLine("No tracked locations.");
+            return 0;
+        }
+
+        foreach (Location location in locations)
+        {
+            output.WriteLine($"{location.Id} {location.Name} {location.Coordinates}");
+        }
+
+        return 0;
+    }
+}
