@@ -10,7 +10,6 @@ namespace Specs.Steps;
 [Binding]
 public sealed class TrackerSteps : IDisposable
 {
-    private const string KathmanduBody = """{"results":[{"id":1283240,"name":"Kathmandu","latitude":27.70169,"longitude":85.3206,"elevation":1317.0,"feature_code":"PPLC","country_code":"NP","admin1_id":12095449,"admin2_id":12095484,"timezone":"Asia/Kathmandu","population":1442271,"country_id":1282988,"country":"Nepal","admin1":"Bagmati Province","admin2":"Kathmandu"}],"generationtime_ms":0.24521351}""";
     private const string NoResultBody = """{"generationtime_ms":0.41663647}""";
 
     private readonly StubHandler _handler = new();
