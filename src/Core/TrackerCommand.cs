@@ -15,6 +15,7 @@ public static class TrackerCommand
         var root = new RootCommand("Tracks the places whose weather a person follows.");
         root.Subcommands.Add(CreateAdd(geocoding));
         root.Subcommands.Add(CreateList());
+        root.Subcommands.Add(CreateForecast(new ForecastClient(http)));
         return root;
     }
 
@@ -47,6 +48,52 @@ public static class TrackerCommand
         command.Options.Add(database);
         command.SetAction(result => List(result, result.GetRequiredValue(database)));
         return command;
+    }
+
+    private static Command CreateForecast(ForecastClient forecast)
+    {
+        var id = new Argument<long>("id")
+        {
+            Description = "The id of the tracked location.",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+        Option<string> database = DatabaseOption();
+        var command = new Command("forecast", "Shows the current weather at a tracked location.");
+        command.Arguments.Add(id);
+        command.Options.Add(database);
+        command.SetAction((result, cancellationToken) =>
+            ForecastAsync(result, forecast, result.GetRequiredValue(id), result.GetRequiredValue(database), cancellationToken));
+        return command;
+    }
+
+    private static async Task<int> ForecastAsync(ParseResult result, ForecastClient forecast, long id, string database, CancellationToken cancellationToken)
+    {
+        InvocationConfiguration configuration = result.InvocationConfiguration;
+        Location? location = new LocationStore(database).Find(id);
+        if (location is null)
+        {
+            configuration.Error.WriteLine($"No tracked location has the id {id}.");
+            return 1;
+        }
+
+        CurrentWeather weather;
+        try
+        {
+            weather = await forecast.GetCurrentAsync(location.Latitude, location.Longitude, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ForecastNoAnswerException)
+        {
+            configuration.Error.WriteLine($"The forecast service gave no answer for {location.Name}.");
+            return 1;
+        }
+        catch (ForecastRefusedException e)
+        {
+            configuration.Error.WriteLine(e.Message);
+            return 1;
+        }
+
+        configuration.Output.WriteLine($"{location.Name} {location.Coordinates}: {weather}");
+        return 0;
     }
 
     private static async Task<int> AddAsync(ParseResult result, GeocodingClient geocoding, string name, string database, CancellationToken cancellationToken)

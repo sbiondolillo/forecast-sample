@@ -63,6 +63,26 @@ public sealed class LocationStoreTests : IDisposable
     }
 
     [Fact]
+    public void FindGivesTheLocationOfTheIdOrNull()
+    {
+        LocationStore store = Store();
+        store.Add(new Place("Kathmandu", 27.70169, 85.3206));
+        Location vaduz = store.Add(new Place("Vaduz", 47.14151, 9.52154));
+
+        Assert.Equal(vaduz, store.Find(2));
+        Assert.Null(store.Find(3));
+    }
+
+    [Fact]
+    public void FindInAMissingFileGivesNullAndDoesNotCreateTheFile()
+    {
+        LocationStore store = Store();
+
+        Assert.Null(store.Find(1));
+        Assert.False(store.Exists);
+    }
+
+    [Fact]
     public void CoordinatesPrintInTheShortestRoundTripForm() =>
         Assert.Equal("(27.70169, 85.3206)", new Location(1, "Kathmandu", 27.70169, 85.3206).Coordinates);
 }
