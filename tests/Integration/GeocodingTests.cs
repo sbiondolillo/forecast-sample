@@ -8,8 +8,8 @@ public sealed class GeocodingTests
 {
     private static async Task<IReadOnlyList<Place>> Search(string name)
     {
-        using var http = new HttpClient();
-        return await new GeocodingClient(http).SearchAsync(name, TestContext.Current.CancellationToken);
+        using HttpClient http = Retry.Client();
+        return await Retry.Run(() => new GeocodingClient(http).SearchAsync(name, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -27,12 +27,15 @@ public sealed class GeocodingTests
     [Fact]
     public async Task UnknownNameHasNoResultsField()
     {
-        using var http = new HttpClient();
-        using HttpResponseMessage response = await http.GetAsync(
-            new Uri("https://geocoding-api.open-meteo.com/v1/search?name=Zzzzqqqxxx"), TestContext.Current.CancellationToken);
+        using HttpClient http = Retry.Client();
+        (System.Net.HttpStatusCode status, string body) = await Retry.Run(async () =>
+        {
+            using HttpResponseMessage response = await http.GetAsync(
+                new Uri("https://geocoding-api.open-meteo.com/v1/search?name=Zzzzqqqxxx"), TestContext.Current.CancellationToken);
+            return (response.StatusCode, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        });
 
-        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
-        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(System.Net.HttpStatusCode.OK, status);
         Assert.DoesNotContain("\"results\"", body, StringComparison.Ordinal);
         Assert.Empty(GeocodingClient.Parse(body));
     }
