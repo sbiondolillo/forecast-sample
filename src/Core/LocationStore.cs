@@ -59,6 +59,9 @@ public sealed class LocationStore(string path)
         return locations;
     }
 
+    /// <summary>The tracked location with the id, or null. A missing file holds none, and the lookup does not create it.</summary>
+    public Location? Find(long id) => List().FirstOrDefault(location => location.Id == id);
+
     private SqliteConnection Open(SqliteOpenMode mode)
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
