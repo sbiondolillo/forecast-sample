@@ -3,12 +3,12 @@ using System.CommandLine.Invocation;
 
 namespace Core;
 
-/// <summary>The command tree of the console program: <c>add</c> and <c>list</c>.</summary>
+/// <summary>The command tree of the console program: <c>add</c>, <c>list</c> and <c>forecast</c>.</summary>
 public static class TrackerCommand
 {
     private const string DefaultDatabase = "forecast.db";
 
-    /// <summary>The root command. The geocoding requests go through the given client.</summary>
+    /// <summary>The root command. The geocoding and forecast requests go through the given client.</summary>
     public static RootCommand Create(HttpClient http)
     {
         var geocoding = new GeocodingClient(http);
