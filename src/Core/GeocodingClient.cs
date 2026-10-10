@@ -21,7 +21,7 @@ public sealed class GeocodingClient(HttpClient http)
     /// <summary>Reads the places from the JSON body of an answer.</summary>
     public static IReadOnlyList<Place> Parse(string json)
     {
-        using JsonDocument document = JsonDocument.Parse(json);
+        using var document = JsonDocument.Parse(json);
         if (!document.RootElement.TryGetProperty("results", out JsonElement results) || results.ValueKind is not JsonValueKind.Array)
         {
             return [];

@@ -6,6 +6,7 @@ using System.CommandLine;
 HostApplicationBuilder builder = Host.CreateApplicationBuilder();
 builder.Services.AddHttpClient();
 using IHost host = builder.Build();
-RootCommand root = TrackerCommand.Create(host.Services.GetRequiredService<IHttpClientFactory>().CreateClient());
+using HttpClient http = host.Services.GetRequiredService<IHttpClientFactory>().CreateClient();
+RootCommand root = TrackerCommand.Create(http);
 ParseResult parse = root.Parse(args);
 return await parse.InvokeAsync().ConfigureAwait(false);

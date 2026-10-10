@@ -72,7 +72,7 @@ public static class TrackerCommand
         Location? location = new LocationStore(database).Find(id);
         if (location is null)
         {
-            configuration.Error.WriteLine($"No tracked location has the id {id}.");
+            await configuration.Error.WriteLineAsync($"No tracked location has the id {id}.").ConfigureAwait(false);
             return 1;
         }
 
@@ -83,16 +83,16 @@ public static class TrackerCommand
         }
         catch (ForecastNoAnswerException)
         {
-            configuration.Error.WriteLine($"The forecast service gave no answer for {location.Name}.");
+            await configuration.Error.WriteLineAsync($"The forecast service gave no answer for {location.Name}.").ConfigureAwait(false);
             return 1;
         }
         catch (ForecastRefusedException e)
         {
-            configuration.Error.WriteLine(e.Message);
+            await configuration.Error.WriteLineAsync(e.Message).ConfigureAwait(false);
             return 1;
         }
 
-        configuration.Output.WriteLine($"{location.Name} {location.Coordinates}: {weather}");
+        await configuration.Output.WriteLineAsync($"{location.Name} {location.Coordinates}: {weather}").ConfigureAwait(false);
         return 0;
     }
 
@@ -106,22 +106,24 @@ public static class TrackerCommand
         }
         catch (Exception e) when (e is HttpRequestException || (e is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            configuration.Error.WriteLine($"The geocoding service gave no answer for \"{name}\".");
+            await configuration.Error.WriteLineAsync($"The geocoding service gave no answer for \"{name}\".").ConfigureAwait(false);
             return 1;
         }
 
         switch (places.Count)
         {
             case 0:
-                configuration.Error.WriteLine($"No place has the name \"{name}\".");
+                await configuration.Error.WriteLineAsync($"No place has the name \"{name}\".").ConfigureAwait(false);
                 return 1;
             case > 1:
-                configuration.Error.WriteLine($"The name \"{name}\" matches several places.");
+                await configuration.Error.WriteLineAsync($"The name \"{name}\" matches several places.").ConfigureAwait(false);
                 return 1;
+            default:
+                break;
         }
 
         Location added = new LocationStore(database).Add(places[0]);
-        configuration.Output.WriteLine($"Added {added.Name} {added.Coordinates}");
+        await configuration.Output.WriteLineAsync($"Added {added.Name} {added.Coordinates}").ConfigureAwait(false);
         return 0;
     }
 

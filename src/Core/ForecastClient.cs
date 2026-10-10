@@ -34,7 +34,7 @@ public sealed class ForecastClient(HttpClient http)
     /// <summary>Reads the current weather from the JSON body of a 200 answer.</summary>
     public static CurrentWeather Parse(string json)
     {
-        using JsonDocument document = JsonDocument.Parse(json);
+        using var document = JsonDocument.Parse(json);
         JsonElement current = document.RootElement.GetProperty("current");
         JsonElement units = document.RootElement.GetProperty("current_units");
         return new CurrentWeather(
@@ -48,7 +48,7 @@ public sealed class ForecastClient(HttpClient http)
     {
         try
         {
-            using JsonDocument document = JsonDocument.Parse(body);
+            using var document = JsonDocument.Parse(body);
             return document.RootElement.ValueKind is JsonValueKind.Object
                 && document.RootElement.TryGetProperty("reason", out JsonElement reason)
                 && reason.ValueKind is JsonValueKind.String

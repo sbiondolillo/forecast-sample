@@ -31,7 +31,7 @@ public sealed class ForecastTests
     [Fact]
     public async Task LatitudeNinetyNineIsRefused()
     {
-        var e = await Assert.ThrowsAsync<ForecastRefusedException>(() => Get(99, 85.3206));
+        ForecastRefusedException e = await Assert.ThrowsAsync<ForecastRefusedException>(() => Get(99, 85.3206));
 
         Assert.Equal("Latitude must be in range of -90 to 90°. Given: 99.0.", e.Reason);
     }
