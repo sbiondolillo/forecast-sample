@@ -46,7 +46,7 @@ public sealed class ForecastClientTests
         using var handler = new StubHandler { Answer = _ => Refusal("""{"reason":"Latitude must be in range of -90 to 90°. Given: 99.0.","error":true}""") };
         using var http = new HttpClient(handler);
 
-        var e = await Assert.ThrowsAsync<ForecastRefusedException>(() => new ForecastClient(http).GetCurrentAsync(99, 2, TestContext.Current.CancellationToken));
+        ForecastRefusedException e = await Assert.ThrowsAsync<ForecastRefusedException>(() => new ForecastClient(http).GetCurrentAsync(99, 2, TestContext.Current.CancellationToken));
 
         Assert.Equal("Latitude must be in range of -90 to 90°. Given: 99.0.", e.Reason);
     }
@@ -57,7 +57,7 @@ public sealed class ForecastClientTests
         using var handler = new StubHandler { Answer = _ => Refusal("not json") };
         using var http = new HttpClient(handler);
 
-        var e = await Assert.ThrowsAsync<ForecastRefusedException>(() => new ForecastClient(http).GetCurrentAsync(1, 2, TestContext.Current.CancellationToken));
+        ForecastRefusedException e = await Assert.ThrowsAsync<ForecastRefusedException>(() => new ForecastClient(http).GetCurrentAsync(1, 2, TestContext.Current.CancellationToken));
 
         Assert.Equal("status 400", e.Reason);
     }
