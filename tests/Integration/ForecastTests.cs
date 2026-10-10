@@ -8,8 +8,8 @@ public sealed class ForecastTests
 {
     private static async Task<CurrentWeather> Get(double latitude, double longitude)
     {
-        using var http = new HttpClient();
-        return await new ForecastClient(http).GetCurrentAsync(latitude, longitude, TestContext.Current.CancellationToken);
+        using HttpClient http = Retry.Client();
+        return await Retry.Run(() => new ForecastClient(http).GetCurrentAsync(latitude, longitude, TestContext.Current.CancellationToken));
     }
 
     [Fact]
