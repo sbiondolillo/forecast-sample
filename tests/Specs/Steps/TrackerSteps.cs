@@ -9,21 +9,15 @@ using Xunit;
 namespace Specs.Steps;
 
 [Binding]
-public sealed class TrackerSteps : IDisposable
+public sealed class TrackerSteps(ProgramRun run) : IDisposable
 {
     private const string NoResultBody = """{"generationtime_ms":0.41663647}""";
 
-    private readonly ProgramRun _run;
+    private readonly ProgramRun _run = run;
     private readonly StubHandler _handler = new();
     private Func<HttpRequestMessage, HttpResponseMessage> _geocoding = NoAnswer;
     private Func<HttpRequestMessage, HttpResponseMessage> _forecast = NoAnswer;
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "forecast-" + Guid.NewGuid().ToString("N"));
-
-    public TrackerSteps(ProgramRun run)
-    {
-        _run = run;
-        _handler.Answer = request => request.RequestUri?.Host is "api.open-meteo.com" ? _forecast(request) : _geocoding(request);
-    }
 
     public void Dispose()
     {
@@ -200,6 +194,7 @@ public sealed class TrackerSteps : IDisposable
             args.Add(_run.Database);
         }
 
+        _handler.Answer = request => request.RequestUri?.Host is "api.open-meteo.com" ? _forecast(request) : _geocoding(request);
         using var http = new HttpClient(_handler, disposeHandler: false);
         using var output = new StringWriter();
         using var error = new StringWriter();
