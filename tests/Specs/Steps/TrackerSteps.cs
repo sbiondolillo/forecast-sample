@@ -13,17 +13,17 @@ public sealed class TrackerSteps : IDisposable
 {
     private const string NoResultBody = """{"generationtime_ms":0.41663647}""";
 
+    private readonly ProgramRun _run;
     private readonly StubHandler _handler = new();
     private Func<HttpRequestMessage, HttpResponseMessage> _geocoding = NoAnswer;
     private Func<HttpRequestMessage, HttpResponseMessage> _forecast = NoAnswer;
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "forecast-" + Guid.NewGuid().ToString("N"));
-    private string _database = "";
-    private string _output = "";
-    private string _error = "";
-    private int _exitCode;
 
-    public TrackerSteps() =>
+    public TrackerSteps(ProgramRun run)
+    {
+        _run = run;
         _handler.Answer = request => request.RequestUri?.Host is "api.open-meteo.com" ? _forecast(request) : _geocoding(request);
+    }
 
     public void Dispose()
     {
@@ -38,14 +38,14 @@ public sealed class TrackerSteps : IDisposable
     public void GivenADatabaseFileThatDoesNotExistYet()
     {
         Directory.CreateDirectory(_directory);
-        _database = Path.Combine(_directory, "forecast.db");
+        _run.Database = Path.Combine(_directory, "forecast.db");
     }
 
     [Given("the database file holds the tracked locations")]
     public void GivenTheDatabaseFileHolds(DataTable table)
     {
         GivenADatabaseFileThatDoesNotExistYet();
-        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _database, Pooling = false }.ToString());
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _run.Database, Pooling = false }.ToString());
         connection.Open();
         using (SqliteCommand create = connection.CreateCommand())
         {
@@ -124,17 +124,17 @@ public sealed class TrackerSteps : IDisposable
     public void ThenSentNoForecastRequest() => Assert.DoesNotContain(_handler.Requests, request => request.Contains("https://api.open-meteo.com", StringComparison.Ordinal));
 
     [Then("standard output is {string}")]
-    public void ThenOutputIs(string expected) => Assert.Equal(expected, _output.TrimEnd());
+    public void ThenOutputIs(string expected) => Assert.Equal(expected, _run.Output.TrimEnd());
 
     [Then("standard output is empty")]
-    public void ThenOutputIsEmpty() => Assert.Equal("", _output);
+    public void ThenOutputIsEmpty() => Assert.Equal("", _run.Output);
 
     [Then("standard output has the lines")]
     public void ThenOutputHasTheLines(string lines) =>
-        Assert.Equal(lines.ReplaceLineEndings("\n"), _output.ReplaceLineEndings("\n").TrimEnd());
+        Assert.Equal(lines.ReplaceLineEndings("\n"), _run.Output.ReplaceLineEndings("\n").TrimEnd());
 
     [Then("standard error is not empty")]
-    public void ThenErrorIsNotEmpty() => Assert.NotEqual("", _error.Trim());
+    public void ThenErrorIsNotEmpty() => Assert.NotEqual("", _run.Error.Trim());
 
     [Then("standard error has a line that says no place has the name and holds {string}")]
     public void ThenErrorSaysNoPlace(string name) => AssertErrorLine("no place has the name", name);
@@ -155,17 +155,17 @@ public sealed class TrackerSteps : IDisposable
     public void ThenErrorSaysForecastRefused(string reason) => AssertErrorLine("forecast service refused the request", reason);
 
     [Then("the exit code is {int}")]
-    public void ThenExitCodeIs(int expected) => Assert.Equal(expected, _exitCode);
+    public void ThenExitCodeIs(int expected) => Assert.Equal(expected, _run.ExitCode);
 
     [Then("the exit code is not 0")]
-    public void ThenExitCodeIsNotZero() => Assert.NotEqual(0, _exitCode);
+    public void ThenExitCodeIsNotZero() => Assert.NotEqual(0, _run.ExitCode);
 
     [Then("standard output holds the option {string} and its default value {string}")]
     public void ThenOutputHoldsOption(string option, string defaultValue) =>
-        Assert.Contains(_output.Split('\n'), line => line.Contains(option, StringComparison.Ordinal) && line.Contains($"[default: {defaultValue}]", StringComparison.Ordinal));
+        Assert.Contains(_run.Output.Split('\n'), line => line.Contains(option, StringComparison.Ordinal) && line.Contains($"[default: {defaultValue}]", StringComparison.Ordinal));
 
     [Then("the database file still does not exist")]
-    public void ThenDatabaseStillMissing() => Assert.False(File.Exists(_database));
+    public void ThenDatabaseStillMissing() => Assert.False(File.Exists(_run.Database));
 
     [Then("the section {string} of {string} holds the line {string}")]
     public static void ThenSectionHoldsLine(string section, string file, string line)
@@ -188,7 +188,7 @@ public sealed class TrackerSteps : IDisposable
 
     private void AssertErrorLine(string phrase, string name) =>
         Assert.Contains(
-            _error.Split('\n'),
+            _run.Error.Split('\n'),
             line => line.Contains(phrase, StringComparison.OrdinalIgnoreCase) && line.Contains(name, StringComparison.Ordinal));
 
     private async Task Run(string arguments, bool withDatabase)
@@ -197,15 +197,15 @@ public sealed class TrackerSteps : IDisposable
         if (withDatabase)
         {
             args.Add("--database");
-            args.Add(_database);
+            args.Add(_run.Database);
         }
 
         using var http = new HttpClient(_handler, disposeHandler: false);
         using var output = new StringWriter();
         using var error = new StringWriter();
         RootCommand root = TrackerCommand.Create(http);
-        _exitCode = await root.Parse([.. args]).InvokeAsync(new InvocationConfiguration { Output = output, Error = error });
-        _output = output.ToString();
-        _error = error.ToString();
+        _run.ExitCode = await root.Parse([.. args]).InvokeAsync(new InvocationConfiguration { Output = output, Error = error });
+        _run.Output = output.ToString();
+        _run.Error = error.ToString();
     }
 }
