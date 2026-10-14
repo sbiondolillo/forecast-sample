@@ -62,6 +62,23 @@ public sealed class LocationStore(string path)
     /// <summary>The tracked location with the id, or null. A missing file holds none, and the lookup does not create it.</summary>
     public Location? Find(long id) => List().FirstOrDefault(location => location.Id == id);
 
+    /// <summary>Removes the tracked location with the id and gives it, or gives null when none has the id. A missing file holds none, and the removal does not create it.</summary>
+    public Location? Remove(long id)
+    {
+        Location? location = Find(id);
+        if (location is null)
+        {
+            return null;
+        }
+
+        using SqliteConnection connection = Open(SqliteOpenMode.ReadWrite);
+        using SqliteCommand delete = connection.CreateCommand();
+        delete.CommandText = "DELETE FROM locations WHERE id = $id";
+        delete.Parameters.AddWithValue("$id", id);
+        delete.ExecuteNonQuery();
+        return location;
+    }
+
     private SqliteConnection Open(SqliteOpenMode mode)
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder

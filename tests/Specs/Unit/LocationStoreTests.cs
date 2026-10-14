@@ -41,6 +41,47 @@ public sealed class LocationStoreTests : IDisposable
         Assert.Throws<SqliteException>(() => new LocationStore(path).List());
     }
 
+    [Fact]
+    public void RemoveOneOfTwoLocationsLeavesTheOtherWithItsId()
+    {
+        LocationStore store = Store();
+        Location first = store.Add(new Place("Kathmandu", 27.70169, 85.3206));
+        Location second = store.Add(new Place("Vaduz", 47.14151, 9.52154));
+
+        Location? removed = store.Remove(first.Id);
+
+        Assert.Equal(first, removed);
+        Assert.Equal([second], store.List());
+    }
+
+    [Fact]
+    public void RemoveAnUnknownIdGivesNullAndChangesNothing()
+    {
+        LocationStore store = Store();
+        Location only = store.Add(new Place("Kathmandu", 27.70169, 85.3206));
+
+        Assert.Null(store.Remove(only.Id + 1));
+        Assert.Equal([only], store.List());
+    }
+
+    [Fact]
+    public void RemoveInAMissingFileGivesNullAndStaysMissing()
+    {
+        LocationStore store = Store();
+
+        Assert.Null(store.Remove(1));
+        Assert.False(store.Exists);
+    }
+
+    [Fact]
+    public void RemoveInAFileWithoutTheTableGivesNull()
+    {
+        string path = Path.Combine(_directory, "forecast.db");
+        Execute(path, "CREATE TABLE other (id INTEGER)");
+
+        Assert.Null(new LocationStore(path).Remove(1));
+    }
+
     private static void Execute(string path, string sql)
     {
         using var connection = new SqliteConnection($"Data Source={path};Pooling=False");

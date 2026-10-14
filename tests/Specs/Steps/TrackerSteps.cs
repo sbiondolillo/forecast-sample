@@ -1,4 +1,5 @@
 using Core;
+using Microsoft.Data.Sqlite;
 using Reqnroll;
 using System.CommandLine;
 using System.CommandLine.Invocation;
@@ -38,6 +39,31 @@ public sealed class TrackerSteps : IDisposable
     {
         Directory.CreateDirectory(_directory);
         _database = Path.Combine(_directory, "forecast.db");
+    }
+
+    [Given("the database file holds the tracked locations")]
+    public void GivenTheDatabaseHolds(DataTable table)
+    {
+        Directory.CreateDirectory(_directory);
+        _database = Path.Combine(_directory, "forecast.db");
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _database, Pooling = false }.ToString());
+        connection.Open();
+        using (SqliteCommand create = connection.CreateCommand())
+        {
+            create.CommandText = "CREATE TABLE locations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL)";
+            create.ExecuteNonQuery();
+        }
+
+        foreach (DataTableRow row in table.Rows)
+        {
+            using SqliteCommand insert = connection.CreateCommand();
+            insert.CommandText = "INSERT INTO locations (id, name, latitude, longitude) VALUES ($id, $name, $latitude, $longitude)";
+            insert.Parameters.AddWithValue("$id", long.Parse(row["id"], CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$name", row["name"]);
+            insert.Parameters.AddWithValue("$latitude", double.Parse(row["latitude"], CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$longitude", double.Parse(row["longitude"], CultureInfo.InvariantCulture));
+            insert.ExecuteNonQuery();
+        }
     }
 
     [Given("the geocoding service answers with one result named {string} at latitude {double} and longitude {double}")]
@@ -129,6 +155,21 @@ public sealed class TrackerSteps : IDisposable
     [Then("standard error has a line that says the forecast service refused the request and holds {string}")]
     public void ThenErrorSaysForecastRefused(string reason) => AssertErrorLine("forecast service refused the request", reason);
 
+    [Then("the database file still does not exist")]
+    public void ThenTheDatabaseStillDoesNotExist() => Assert.False(File.Exists(_database));
+
+    [Then("the section {string} of {string} holds the line {string}")]
+    public static void ThenTheSectionHoldsTheLine(string section, string file, string line)
+    {
+        string path = Path.Combine(RepoRoot(), file);
+        Assert.True(File.Exists(path), $"The file {file} is missing.");
+        string[] lines = File.ReadAllLines(path);
+        int start = Array.FindIndex(lines, l => l.TrimEnd() == $"## {section}");
+        Assert.True(start >= 0, $"The file {file} has no section {section}.");
+        IEnumerable<string> body = lines.Skip(start + 1).TakeWhile(l => !l.StartsWith("## ", StringComparison.Ordinal));
+        Assert.Contains(line, body.Select(l => l.Trim()));
+    }
+
     [Then("the exit code is {int}")]
     public void ThenExitCodeIs(int expected) => Assert.Equal(expected, _exitCode);
 
@@ -138,6 +179,19 @@ public sealed class TrackerSteps : IDisposable
     [Then("standard output holds the option {string} and its default value {string}")]
     public void ThenOutputHoldsOption(string option, string defaultValue) =>
         Assert.Contains(_output.Split('\n'), line => line.Contains(option, StringComparison.Ordinal) && line.Contains($"[default: {defaultValue}]", StringComparison.Ordinal));
+
+    private static string RepoRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Solution.slnx")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new InvalidOperationException("The repo root was not found.");
+    }
 
     private static HttpResponseMessage NoAnswer(HttpRequestMessage request) => throw new HttpRequestException("No answer.");
 

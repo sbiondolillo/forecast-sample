@@ -57,6 +57,12 @@ Show the current weather at a tracked location:
 dotnet run --project src/App -- forecast <id>
 ```
 
+Remove a tracked location by its id:
+
+```sh
+dotnet run --project src/App -- remove <id>
+```
+
 Each subcommand takes the option `--database`.
 It names the SQLite file that holds the tracked locations.
 Its default value is `forecast.db`.
