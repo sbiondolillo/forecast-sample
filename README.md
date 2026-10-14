@@ -1,6 +1,6 @@
-# forecast
+# tracker
 
-`forecast` is a console program that tracks the places whose weather a person follows.
+`tracker` is a console program that tracks the places whose weather a person follows.
 It shows the current weather at one of them.
 It calls the Open-Meteo geocoding API and the Open-Meteo forecast API.
 Neither service needs a key.

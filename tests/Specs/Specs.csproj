@@ -21,5 +21,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Core/Core.csproj" />
+    <!-- Builds the program before the tests run, for the steps that launch it. -->
+    <ProjectReference Include="../../src/App/App.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
