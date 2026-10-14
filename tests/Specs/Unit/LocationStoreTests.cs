@@ -83,6 +83,56 @@ public sealed class LocationStoreTests : IDisposable
     }
 
     [Fact]
+    public void RemoveGivesTheLocationAndListNoLongerHoldsIt()
+    {
+        LocationStore store = Store();
+        Location kathmandu = store.Add(new Place("Kathmandu", 27.70169, 85.3206));
+
+        Assert.Equal(kathmandu, store.Remove(1));
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public void RemoveLeavesTheOtherLocationsTheirIds()
+    {
+        LocationStore store = Store();
+        store.Add(new Place("Kathmandu", 27.70169, 85.3206));
+        Location vaduz = store.Add(new Place("Vaduz", 47.14151, 9.52154));
+
+        store.Remove(1);
+
+        Assert.Equal([vaduz], store.List());
+    }
+
+    [Fact]
+    public void RemoveAnUnknownIdGivesNullAndLeavesTheRows()
+    {
+        LocationStore store = Store();
+        Location kathmandu = store.Add(new Place("Kathmandu", 27.70169, 85.3206));
+
+        Assert.Null(store.Remove(2));
+        Assert.Equal([kathmandu], store.List());
+    }
+
+    [Fact]
+    public void RemoveInAMissingFileGivesNullAndDoesNotCreateTheFile()
+    {
+        LocationStore store = Store();
+
+        Assert.Null(store.Remove(1));
+        Assert.False(store.Exists);
+    }
+
+    [Fact]
+    public void RemoveInAFileWithoutTheTableGivesNull()
+    {
+        string path = Path.Combine(_directory, "forecast.db");
+        Execute(path, "CREATE TABLE other (id INTEGER)");
+
+        Assert.Null(new LocationStore(path).Remove(1));
+    }
+
+    [Fact]
     public void CoordinatesPrintInTheShortestRoundTripForm() =>
         Assert.Equal("(27.70169, 85.3206)", new Location(1, "Kathmandu", 27.70169, 85.3206).Coordinates);
 }

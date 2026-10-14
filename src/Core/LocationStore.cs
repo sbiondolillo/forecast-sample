@@ -36,15 +36,11 @@ public sealed class LocationStore(string path)
         }
 
         using SqliteConnection connection = Open(SqliteOpenMode.ReadOnly);
-        using (SqliteCommand probe = connection.CreateCommand())
-        {
-            probe.CommandText = "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'locations'";
 
-            // A file with no table holds no locations.
-            if (probe.ExecuteScalar() is null)
-            {
-                return [];
-            }
+        // A file with no table holds no locations.
+        if (!HasTable(connection))
+        {
+            return [];
         }
 
         using SqliteCommand select = connection.CreateCommand();
@@ -61,6 +57,36 @@ public sealed class LocationStore(string path)
 
     /// <summary>The tracked location with the id, or null. A missing file holds none, and the lookup does not create it.</summary>
     public Location? Find(long id) => List().FirstOrDefault(location => location.Id == id);
+
+    /// <summary>Removes the tracked location with the id and gives it, or gives null when none has the id. A missing file or a file with no table holds none, and the removal does not create the file.</summary>
+    public Location? Remove(long id)
+    {
+        if (!Exists)
+        {
+            return null;
+        }
+
+        using SqliteConnection connection = Open(SqliteOpenMode.ReadWrite);
+        if (!HasTable(connection))
+        {
+            return null;
+        }
+
+        using SqliteCommand delete = connection.CreateCommand();
+        delete.CommandText = "DELETE FROM locations WHERE id = $id RETURNING id, name, latitude, longitude";
+        delete.Parameters.AddWithValue("$id", id);
+        using SqliteDataReader reader = delete.ExecuteReader();
+        return reader.Read()
+            ? new Location(reader.GetInt64(0), reader.GetString(1), reader.GetDouble(2), reader.GetDouble(3))
+            : null;
+    }
+
+    private static bool HasTable(SqliteConnection connection)
+    {
+        using SqliteCommand probe = connection.CreateCommand();
+        probe.CommandText = "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'locations'";
+        return probe.ExecuteScalar() is not null;
+    }
 
     private SqliteConnection Open(SqliteOpenMode mode)
     {

@@ -1,4 +1,5 @@
 using Core;
+using Microsoft.Data.Sqlite;
 using Reqnroll;
 using System.CommandLine;
 using System.CommandLine.Invocation;
@@ -38,6 +39,30 @@ public sealed class TrackerSteps : IDisposable
     {
         Directory.CreateDirectory(_directory);
         _database = Path.Combine(_directory, "forecast.db");
+    }
+
+    [Given("the database file holds the tracked locations")]
+    public void GivenTheDatabaseFileHolds(DataTable table)
+    {
+        GivenADatabaseFileThatDoesNotExistYet();
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _database, Pooling = false }.ToString());
+        connection.Open();
+        using (SqliteCommand create = connection.CreateCommand())
+        {
+            create.CommandText = "CREATE TABLE locations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL)";
+            create.ExecuteNonQuery();
+        }
+
+        foreach (DataTableRow row in table.Rows)
+        {
+            using SqliteCommand insert = connection.CreateCommand();
+            insert.CommandText = "INSERT INTO locations (id, name, latitude, longitude) VALUES ($id, $name, $latitude, $longitude)";
+            insert.Parameters.AddWithValue("$id", long.Parse(row["id"], CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$name", row["name"]);
+            insert.Parameters.AddWithValue("$latitude", double.Parse(row["latitude"], CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$longitude", double.Parse(row["longitude"], CultureInfo.InvariantCulture));
+            insert.ExecuteNonQuery();
+        }
     }
 
     [Given("the geocoding service answers with one result named {string} at latitude {double} and longitude {double}")]
@@ -138,6 +163,26 @@ public sealed class TrackerSteps : IDisposable
     [Then("standard output holds the option {string} and its default value {string}")]
     public void ThenOutputHoldsOption(string option, string defaultValue) =>
         Assert.Contains(_output.Split('\n'), line => line.Contains(option, StringComparison.Ordinal) && line.Contains($"[default: {defaultValue}]", StringComparison.Ordinal));
+
+    [Then("the database file still does not exist")]
+    public void ThenDatabaseStillMissing() => Assert.False(File.Exists(_database));
+
+    [Then("the section {string} of {string} holds the line {string}")]
+    public static void ThenSectionHoldsLine(string section, string file, string line)
+    {
+        string root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "Solution.slnx")))
+        {
+            root = Path.GetDirectoryName(root) ?? throw new InvalidOperationException("The repo root was not found.");
+        }
+
+        string heading = $"## {section}";
+        string[] lines = File.ReadAllLines(Path.Combine(root, file));
+        int start = Array.FindIndex(lines, l => l.TrimEnd() == heading);
+        Assert.True(start >= 0, $"{file} has no heading \"{heading}\".");
+        IEnumerable<string> body = lines.Skip(start + 1).TakeWhile(l => !l.StartsWith("## ", StringComparison.Ordinal));
+        Assert.Contains(line, body.Select(l => l.Trim()));
+    }
 
     private static HttpResponseMessage NoAnswer(HttpRequestMessage request) => throw new HttpRequestException("No answer.");
 
