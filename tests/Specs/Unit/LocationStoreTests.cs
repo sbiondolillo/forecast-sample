@@ -82,6 +82,18 @@ public sealed class LocationStoreTests : IDisposable
         Assert.Null(new LocationStore(path).Remove(1));
     }
 
+    [Fact]
+    public void RemoveGivesNullWhenNoRowWasDeleted()
+    {
+        LocationStore store = Store();
+        Location only = store.Add(new Place("Kathmandu", 27.70169, 85.3206));
+
+        // The trigger makes the DELETE affect no row, as a concurrent removal would.
+        Execute(Path.Combine(_directory, "forecast.db"), "CREATE TRIGGER skip BEFORE DELETE ON locations BEGIN SELECT RAISE(IGNORE); END");
+
+        Assert.Null(store.Remove(only.Id));
+    }
+
     private static void Execute(string path, string sql)
     {
         using var connection = new SqliteConnection($"Data Source={path};Pooling=False");

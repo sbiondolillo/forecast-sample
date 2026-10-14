@@ -75,8 +75,9 @@ public sealed class LocationStore(string path)
         using SqliteCommand delete = connection.CreateCommand();
         delete.CommandText = "DELETE FROM locations WHERE id = $id";
         delete.Parameters.AddWithValue("$id", id);
-        delete.ExecuteNonQuery();
-        return location;
+
+        // A concurrent removal may have deleted the row after the lookup.
+        return delete.ExecuteNonQuery() is 0 ? null : location;
     }
 
     private SqliteConnection Open(SqliteOpenMode mode)
