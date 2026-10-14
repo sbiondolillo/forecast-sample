@@ -3,7 +3,7 @@ using System.CommandLine.Invocation;
 
 namespace Core;
 
-/// <summary>The command tree of the console program: <c>add</c>, <c>list</c> and <c>forecast</c>.</summary>
+/// <summary>The command tree of the console program: <c>add</c>, <c>list</c>, <c>forecast</c> and <c>remove</c>.</summary>
 public static class TrackerCommand
 {
     private const string DefaultDatabase = "forecast.db";
@@ -16,6 +16,7 @@ public static class TrackerCommand
         root.Subcommands.Add(CreateAdd(geocoding));
         root.Subcommands.Add(CreateList());
         root.Subcommands.Add(CreateForecast(new ForecastClient(http)));
+        root.Subcommands.Add(CreateRemove());
         return root;
     }
 
@@ -64,6 +65,35 @@ public static class TrackerCommand
         command.SetAction((result, cancellationToken) =>
             ForecastAsync(result, forecast, result.GetRequiredValue(id), result.GetRequiredValue(database), cancellationToken));
         return command;
+    }
+
+    private static Command CreateRemove()
+    {
+        var id = new Argument<long>("id")
+        {
+            Description = "The id of the tracked location.",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+        Option<string> database = DatabaseOption();
+        var command = new Command("remove", "Removes a tracked location by its id.");
+        command.Arguments.Add(id);
+        command.Options.Add(database);
+        command.SetAction(result => Remove(result, result.GetRequiredValue(id), result.GetRequiredValue(database)));
+        return command;
+    }
+
+    private static int Remove(ParseResult result, long id, string database)
+    {
+        InvocationConfiguration configuration = result.InvocationConfiguration;
+        Location? removed = new LocationStore(database).Remove(id);
+        if (removed is null)
+        {
+            configuration.Error.WriteLine($"No tracked location has the id {id}.");
+            return 1;
+        }
+
+        configuration.Output.WriteLine($"Removed {removed.Name} {removed.Coordinates}");
+        return 0;
     }
 
     private static async Task<int> ForecastAsync(ParseResult result, ForecastClient forecast, long id, string database, CancellationToken cancellationToken)
